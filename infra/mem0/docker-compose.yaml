@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   mem0-postgres:
-    image: 'pgvector/pgvector:0.8.2-pg16-trixie'
+    image: 'ankane/pgvector:v0.5.1'
     container_name: factory-mem0-postgres
     restart: unless-stopped
     platform: linux/arm64/v8
@@ -58,7 +58,6 @@ services:
       context: ./infra/mem0
       dockerfile: Dockerfile.mem0-dashboard
     container_name: factory-mem0-dashboard
-    platform: linux/arm64/v8
     restart: unless-stopped
     environment:
       - 'NEXT_PUBLIC_API_URL=http://mem0:8000'
