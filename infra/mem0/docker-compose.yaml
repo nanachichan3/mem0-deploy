@@ -57,7 +57,6 @@ services:
     build:
       context: ./infra/mem0
       dockerfile: Dockerfile.mem0-dashboard
-      platform: linux/amd64
     container_name: factory-mem0-dashboard
     platform: linux/amd64
     restart: unless-stopped
