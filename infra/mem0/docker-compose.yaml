@@ -1,10 +1,10 @@
 version: '3.8'
 services:
   mem0-postgres:
-    image: 'pgvector/pgvector:pg16-trixie'
+    image: 'pgvector/pgvector:0.8.2-pg16-trixie'
     container_name: factory-mem0-postgres
     restart: unless-stopped
-    platform: linux/amd64
+    platform: linux/arm64/v8
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: '${MEM0_POSTGRES_PASSWORD:-mem0-local-pg}'
@@ -23,7 +23,7 @@ services:
     image: 'mem0/mem0-api-server:latest'
     container_name: factory-mem0
     restart: unless-stopped
-    platform: linux/amd64
+    platform: linux/arm64/v8
     ports:
       - '8888:8000'
     environment:
@@ -58,7 +58,7 @@ services:
       context: ./infra/mem0
       dockerfile: Dockerfile.mem0-dashboard
     container_name: factory-mem0-dashboard
-    platform: linux/amd64
+    platform: linux/arm64/v8
     restart: unless-stopped
     environment:
       - 'NEXT_PUBLIC_API_URL=http://mem0:8000'
