@@ -4,7 +4,6 @@ services:
     image: 'ankane/pgvector:v0.5.1'
     container_name: factory-mem0-postgres
     restart: unless-stopped
-    platform: linux/arm64/v8
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: '${MEM0_POSTGRES_PASSWORD:-mem0-local-pg}'
