@@ -10,6 +10,8 @@ services:
     restart: unless-stopped
     expose:
       - "8000"
+    volumes:
+      - mem0_history:/app/history
     networks:
       - coolify
       - mem0_network
@@ -163,6 +165,7 @@ services:
       - traefik.http.services.mem0-dashboard.loadbalancer.server.port=3000
 
 volumes:
+  mem0_history:
   neo4j_data:
   postgres_db:
 
