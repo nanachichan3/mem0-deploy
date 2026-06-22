@@ -1,0 +1,169 @@
+# Coolify raw Docker Compose deployment for Mem0 self-host.
+# Uses remote Git build contexts because Coolify service stacks do not have this
+# local directory available as a compose build context.
+
+services:
+  mem0:
+    build:
+      context: https://github.com/nanachichan3/mem0-deploy.git#main:infra/mem0
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8000"
+    networks:
+      - coolify
+      - mem0_network
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/auth/setup-status')",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 36
+      start_period: 120s
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_COLLECTION_NAME: ${POSTGRES_COLLECTION_NAME:-memories}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      APP_DB_NAME: ${APP_DB_NAME:-mem0_app}
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_DISABLED: ${AUTH_DISABLED:-false}
+      DASHBOARD_URL: ${DASHBOARD_URL}
+      MEM0_DEFAULT_LLM_MODEL: ${MEM0_DEFAULT_LLM_MODEL:-gpt-4.1-nano-2025-04-14}
+      MEM0_DEFAULT_EMBEDDER_MODEL: ${MEM0_DEFAULT_EMBEDDER_MODEL:-text-embedding-3-small}
+      MEM0_TELEMETRY: ${MEM0_TELEMETRY:-false}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mem0-api-http.rule=Host(`mem0-api.qed.quest`)
+      - traefik.http.routers.mem0-api-http.entrypoints=http
+      - traefik.http.routers.mem0-api-http.middlewares=redirect-to-https
+      - traefik.http.routers.mem0-api-https.rule=Host(`mem0-api.qed.quest`)
+      - traefik.http.routers.mem0-api-https.entrypoints=https
+      - traefik.http.routers.mem0-api-https.tls=true
+      - traefik.http.routers.mem0-api-https.tls.certresolver=letsencrypt
+      - traefik.http.services.mem0-api.loadbalancer.server.port=8000
+
+  postgres:
+    image: ankane/pgvector:v0.5.1
+    restart: unless-stopped
+    shm_size: "128mb"
+    networks:
+      - mem0_network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -q -d \"$$POSTGRES_DB\" -U \"$$POSTGRES_USER\" || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_db:/var/lib/postgresql/data
+
+  postgres-init:
+    image: ankane/pgvector:v0.5.1
+    restart: "no"
+    networks:
+      - mem0_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      APP_DB_NAME: ${APP_DB_NAME:-mem0_app}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    command:
+      [
+        "sh",
+        "-c",
+        "psql -h postgres -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -tc \"SELECT 1 FROM pg_database WHERE datname = '$${APP_DB_NAME}'\" | grep -q 1 || psql -h postgres -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -c \"CREATE DATABASE \\\"$${APP_DB_NAME}\\\"\"",
+      ]
+
+  neo4j:
+    image: neo4j:5.26.4
+    restart: unless-stopped
+    networks:
+      - mem0_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "cypher-shell -u neo4j -p \"$${NEO4J_PASSWORD}\" -a bolt://localhost:7687 'RETURN 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+    volumes:
+      - neo4j_data:/data
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_apoc_import_file_use__neo4j__config: "true"
+
+  mem0-dashboard:
+    build:
+      context: https://github.com/nanachichan3/mem0-deploy.git#main:infra/mem0
+      dockerfile: Dockerfile.mem0-dashboard
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${MEM0_DASHBOARD_PUBLIC_API_URL}
+      API_INTERNAL_URL: http://mem0:8000
+      NEXT_PUBLIC_INSTANCE_NAME: ${MEM0_DASHBOARD_INSTANCE:-Mem0}
+    depends_on:
+      mem0:
+        condition: service_healthy
+    networks:
+      - coolify
+      - mem0_network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mem0-dashboard-http.rule=Host(`mem0.qed.quest`)
+      - traefik.http.routers.mem0-dashboard-http.entrypoints=http
+      - traefik.http.routers.mem0-dashboard-http.middlewares=redirect-to-https
+      - traefik.http.routers.mem0-dashboard-https.rule=Host(`mem0.qed.quest`)
+      - traefik.http.routers.mem0-dashboard-https.entrypoints=https
+      - traefik.http.routers.mem0-dashboard-https.tls=true
+      - traefik.http.routers.mem0-dashboard-https.tls.certresolver=letsencrypt
+      - traefik.http.services.mem0-dashboard.loadbalancer.server.port=3000
+
+volumes:
+  neo4j_data:
+  postgres_db:
+
+networks:
+  coolify:
+    external: true
+  mem0_network:
+    driver: bridge
