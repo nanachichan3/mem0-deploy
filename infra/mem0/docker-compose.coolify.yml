@@ -5,7 +5,7 @@
 services:
   mem0:
     build:
-      context: https://github.com/nanachichan3/mem0-deploy.git#main:infra/mem0
+      context: https://github.com/nanachichan3/mem0-deploy.git#master:infra/mem0
       dockerfile: Dockerfile
     restart: unless-stopped
     expose:
@@ -124,6 +124,7 @@ services:
     volumes:
       - neo4j_data:/data
     environment:
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_apoc_export_file_enabled: "true"
@@ -132,7 +133,7 @@ services:
 
   mem0-dashboard:
     build:
-      context: https://github.com/nanachichan3/mem0-deploy.git#main:infra/mem0
+      context: https://github.com/nanachichan3/mem0-deploy.git#master:infra/mem0
       dockerfile: Dockerfile.mem0-dashboard
     restart: unless-stopped
     expose:
