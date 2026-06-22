@@ -56,6 +56,7 @@ services:
       MEM0_TELEMETRY: ${MEM0_TELEMETRY:-false}
     labels:
       - traefik.enable=true
+      - traefik.docker.network=coolify
       - traefik.http.routers.mem0-api-http.rule=Host(`mem0-api.qed.quest`)
       - traefik.http.routers.mem0-api-http.entrypoints=http
       - traefik.http.routers.mem0-api-http.middlewares=redirect-to-https
@@ -151,6 +152,7 @@ services:
       - coolify
     labels:
       - traefik.enable=true
+      - traefik.docker.network=coolify
       - traefik.http.routers.mem0-dashboard-http.rule=Host(`mem0.qed.quest`)
       - traefik.http.routers.mem0-dashboard-http.entrypoints=http
       - traefik.http.routers.mem0-dashboard-http.middlewares=redirect-to-https
